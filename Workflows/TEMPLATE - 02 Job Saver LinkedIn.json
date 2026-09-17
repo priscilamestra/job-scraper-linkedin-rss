@@ -1,0 +1,725 @@
+{
+  "name": "TEMPLATE - 02 Job Saver LinkedIn",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "2f797a06-346d-4d5a-bfd6-69a5ae90a5df",
+      "name": "Receive Jobs",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -432,
+        736
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const jobs = $input.all()\n  .map(item => item.json ?? {})\n  .filter(job => job.job_id || job.url);\n\n\n/*\n  Normalize fields that can accept multiple values.\n\n  Example:\n  \"Mid, Senior\"\n*/\nfunction normalizeMulti(value, allowedValues) {\n  if (!value) {\n    return '';\n  }\n\n  const values = Array.isArray(value)\n    ? value\n    : String(value).split(',');\n\n  const normalized = values\n    .map(v => String(v).trim())\n    .filter(Boolean)\n    .filter(v => allowedValues.includes(v));\n\n  return [...new Set(normalized)]\n    .join(', ');\n}\n\n\n/*\n  Normalize fields that accept only one value.\n*/\nfunction normalizeSingle(value, allowedValues) {\n  if (!value) {\n    return '';\n  }\n\n  const normalized =\n    String(value).trim();\n\n  return allowedValues.includes(normalized)\n    ? normalized\n    : '';\n}\n\n\nreturn jobs.map(job => {\n\n  const workMode = normalizeSingle(\n    job.work_mode,\n    [\n      'Remote',\n      'Hybrid',\n      'On-site'\n    ]\n  );\n\n\n  const payment = normalizeMulti(\n    job.payment ?? job.payment_type,\n    [\n      'Hourly',\n      'Fixed-price',\n      'Weekly',\n      'Monthly',\n      'Annual',\n      'Not specified'\n    ]\n  );\n\n\n  const timeType = normalizeSingle(\n    job.time_type,\n    [\n      'Part-time',\n      'Full-time'\n    ]\n  );\n\n\n  const jobType = normalizeMulti(\n    job.job_type,\n    [\n      'Contract',\n      'Internship',\n      'Freelance',\n      'Temporary',\n      'PJ',\n      'CLT',\n      'Long-term'\n    ]\n  );\n\n\n  const experience = normalizeMulti(\n    job.experience,\n    [\n      'Senior',\n      'Mid',\n      'Specialist',\n      'Junior',\n      'Intern',\n      'Lead'\n    ]\n  );\n\n\n  const status =\n    normalizeSingle(\n      job.status,\n      [\n        'To do',\n        'Applying',\n        'Applied',\n        'Closed',\n        'Mismatch',\n        'Not selected',\n        'Selected',\n        'Interview',\n        'Offer',\n        'Hired'\n      ]\n    ) || 'To do';\n\n\n  const language = normalizeSingle(\n    job.language,\n    [\n      'English',\n      'Portuguese'\n    ]\n  );\n\n\n  const match = normalizeSingle(\n    job.match,\n    [\n      'Low',\n      'Medium',\n      'High'\n    ]\n  );\n\n\n  const qualified = normalizeSingle(\n    job.qualified,\n    [\n      'Yeap',\n      'Nope'\n    ]\n  );\n\n\n  return {\n    json: {\n\n      // A - Job ID\n      job_id:\n        String(\n          job.job_id ||\n          `url:${job.url}`\n        ),\n\n      // B - Status\n      status,\n\n      // C - Date Scraped\n      date_scraped:\n        job.date_scraped ?? '',\n\n      // D - Source\n      source:\n        job.source ??\n        job._source ??\n        '',\n\n      // E - Search Keyword\n      search_keyword:\n        job.search_keyword ?? '',\n\n      // F - Date Posted\n      date_posted:\n        job.date_posted ?? '',\n\n      // G - Title\n      title:\n        job.title ||\n        'Not specified',\n\n      // H - Work Mode\n      work_mode:\n        workMode,\n\n      // I - URL\n      url:\n        job.url ?? '',\n\n      // J - Company Name\n      company_name:\n        job.company_name ?? '',\n\n      // K - Location\n      location:\n        job.location ??\n        job.location_geo ??\n        job.job_location ??\n        '',\n\n      // L - Description\n      description:\n        job.description ?? '',\n\n      // M - Language\n      language,\n\n      // N - Payment\n      payment,\n\n      // O - Time Type\n      time_type:\n        timeType,\n\n      // P - Job Type\n      job_type:\n        jobType,\n\n      // Q - Experience\n      experience,\n\n      // R - Salary\n      salary:\n        job.salary ?? '',\n\n      // S - Match\n      match,\n\n      // T - Qualified\n      qualified,\n\n      // U - Cover Letter\n      cover_letter:\n        job.cover_letter ?? '',\n\n      // V - Notes\n      notes:\n        job.notes ?? '',\n\n      // W - Interview At\n      interview_at:\n        job.interview_at ?? '',\n\n      // X - Invite Meet\n      invite_meet:\n        job.invite_meet ?? '',\n\n      // Y - Attended\n      attended:\n        job.attended === true ||\n        String(job.attended ?? '')\n          .toLowerCase() === 'true',\n\n\n      // Internal workflow metadata\n      posted_at:\n        job.posted_at ?? '',\n\n      scraped_at:\n        job.scraped_at ?? ''\n    }\n  };\n});"
+      },
+      "id": "cc77d4a9-ca30-4f87-8210-508cea3e271d",
+      "name": "Format Jobs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -272,
+        736
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "45af6f76-cd60-4ac5-88e1-57c98035ad41",
+      "name": "Loop Over Jobs",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        688,
+        736
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const job = $json ?? {};\n\n\n/*\n  Public template configuration.\n\n  Replace this placeholder with the Google Sheets\n  spreadsheet ID used as the job tracker.\n*/\nconst SPREADSHEET_ID =\n  'YOUR_GOOGLE_SHEET_ID';\n\n\n/*\n  Reference timezone used by the template.\n\n  Users should change the workflow timezone and this\n  value if their job tracker should follow another\n  local timezone.\n*/\nconst TIME_ZONE =\n  'America/Sao_Paulo';\n\n\n/*\n  Monthly sheet names expected by the Google Sheets\n  job tracker template.\n*/\nconst MONTHS = [\n  'JANEIRO',\n  'FEVEREIRO',\n  'MARÇO',\n  'ABRIL',\n  'MAIO',\n  'JUNHO',\n  'JULHO',\n  'AGOSTO',\n  'SETEMBRO',\n  'OUTUBRO',\n  'NOVEMBRO',\n  'DEZEMBRO'\n];\n\n\n/*\n  Resolve the target month from a valid timestamp.\n\n  posted_at is stored internally as an ISO timestamp,\n  so this is the preferred routing method.\n*/\nfunction monthNameFromDate(dateValue) {\n  const date =\n    new Date(dateValue);\n\n  if (\n    Number.isNaN(date.getTime())\n  ) {\n    return null;\n  }\n\n  const monthNumber =\n    Number(\n      new Intl.DateTimeFormat(\n        'en-US',\n        {\n          timeZone: TIME_ZONE,\n          month: '2-digit'\n        }\n      ).format(date)\n    );\n\n  return (\n    MONTHS[monthNumber - 1] ??\n    null\n  );\n}\n\n\n/*\n  Fallback for Date Scraped values formatted as:\n\n  DD/MM/YYYY\n  or\n  DD/MM/YYYY HH:mm\n*/\nfunction monthNameFromFormattedDate(value) {\n  const text =\n    String(value ?? '').trim();\n\n  const match =\n    text.match(\n      /^(\\d{2})\\/(\\d{2})\\/(\\d{4})(?:\\s+\\d{2}:\\d{2}(?::\\d{2})?)?$/\n    );\n\n  if (!match) {\n    return null;\n  }\n\n  const monthNumber =\n    Number(match[2]);\n\n  return (\n    MONTHS[monthNumber - 1] ??\n    null\n  );\n}\n\n\n/*\n  Monthly routing strategy:\n\n  1. Prefer posted_at and store the job in the month\n     when the LinkedIn posting was published.\n\n  2. If posted_at is unavailable, fall back to\n     Date Scraped.\n*/\nconst targetSheet =\n  (\n    job.posted_at\n      ? monthNameFromDate(\n          job.posted_at\n        )\n      : null\n  ) ||\n  monthNameFromFormattedDate(\n    job.date_scraped\n  );\n\n\nif (!targetSheet) {\n  throw new Error(\n    `Unable to determine the target monthly sheet. ` +\n    `posted_at=${job.posted_at || 'empty'}; ` +\n    `date_scraped=${job.date_scraped || 'empty'}`\n  );\n}\n\n\nif (\n  !MONTHS.includes(targetSheet)\n) {\n  throw new Error(\n    `Invalid monthly sheet: ${targetSheet}`\n  );\n}\n\n\n/*\n  Job ID is stored in column A.\n\n  Deduplication therefore checks column A across\n  all 12 monthly sheets.\n*/\nconst dedupeRanges =\n  MONTHS.map(\n    month =>\n      `${month}!A:A`\n  );\n\n\nconst rangesQuery =\n  dedupeRanges\n    .map(\n      range =>\n        `ranges=${encodeURIComponent(range)}`\n    )\n    .join('&');\n\n\n/*\n  One Google Sheets batchGet request checks the\n  LinkedIn Job ID across all monthly tabs.\n*/\nconst dedupeUrl =\n  `https://sheets.googleapis.com/v4/spreadsheets/` +\n  `${SPREADSHEET_ID}/values:batchGet?` +\n  rangesQuery;\n\n\nreturn [{\n  json: {\n    ...job,\n\n    target_sheet:\n      targetSheet,\n\n    dedupe_url:\n      dedupeUrl,\n\n    /*\n      Google Sheets target structure:\n      columns A:Y = 25 columns.\n    */\n    append_range_encoded:\n      encodeURIComponent(\n        `${targetSheet}!A:Y`\n      ),\n\n    /*\n      Exact Google Sheets column order.\n    */\n    row_values: [\n\n      job.job_id ?? '',          // A - Job ID\n\n      job.status ?? '',          // B - Status\n\n      job.date_scraped ?? '',    // C - Date Scraped\n\n      job.source ?? '',          // D - Source\n\n      job.search_keyword ?? '',  // E - Search Keyword\n\n      job.date_posted ?? '',     // F - Date Posted\n\n      job.title ?? '',           // G - Title\n\n      job.work_mode ?? '',       // H - Work Mode\n\n      job.url ?? '',             // I - URL\n\n      job.company_name ?? '',    // J - Company Name\n\n      job.location ?? '',        // K - Location\n\n      job.description ?? '',     // L - Description\n\n      job.language ?? '',        // M - Language\n\n      job.payment ?? '',         // N - Payment\n\n      job.time_type ?? '',       // O - Time Type\n\n      job.job_type ?? '',        // P - Job Type\n\n      job.experience ?? '',      // Q - Experience\n\n      job.salary ?? '',          // R - Salary\n\n      job.match ?? '',           // S - Match\n\n      job.qualified ?? '',       // T - Qualified\n\n      job.cover_letter ?? '',    // U - Cover Letter\n\n      job.notes ?? '',           // V - Notes\n\n      job.interview_at ?? '',    // W - Interview At\n\n      job.invite_meet ?? '',     // X - Invite Meet\n\n      job.attended ?? false      // Y - Attended\n    ]\n  }\n}];"
+      },
+      "id": "89a87720-f93d-49c9-b586-0ec46e23ba43",
+      "name": "Prepare Monthly Row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1136,
+        752
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.dedupe_url }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "options": {}
+      },
+      "id": "88b3a1fe-4840-4eee-8ffd-6cf6e3f1b6a2",
+      "name": "Check Job IDs - All Months",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1360,
+        752
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "gC5t4ydGzpTmYqDa",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx =\n  $('Prepare Monthly Row').item.json ?? {};\n\nconst valueRanges =\n  Array.isArray($json.valueRanges)\n    ? $json.valueRanges\n    : [];\n\nconst existingIds =\n  new Set();\n\n\n/*\n  Collect all LinkedIn Job IDs from column A\n  across all 12 monthly sheets.\n*/\nfor (const range of valueRanges) {\n  const values =\n    Array.isArray(range.values)\n      ? range.values\n      : [];\n\n  for (const row of values) {\n    const value =\n      String(\n        row?.[0] ?? ''\n      ).trim();\n\n    if (\n      !value ||\n      value === 'Job ID'\n    ) {\n      continue;\n    }\n\n    existingIds.add(value);\n  }\n}\n\n\nconst currentId =\n  String(\n    ctx.job_id ?? ''\n  ).trim();\n\n\n/*\n  Find the column A response that belongs specifically\n  to the monthly sheet where this job will be stored.\n*/\nconst targetSheetName =\n  String(\n    ctx.target_sheet ?? ''\n  )\n    .trim()\n    .toUpperCase();\n\n\nconst targetRange =\n  valueRanges.find(range => {\n    const rangeName =\n      String(\n        range.range ?? ''\n      )\n        .replace(/'/g, '')\n        .toUpperCase();\n\n    return rangeName.startsWith(\n      `${targetSheetName}!A`\n    );\n  });\n\n\nconst targetValues =\n  Array.isArray(targetRange?.values)\n    ? targetRange.values\n    : [];\n\n\n/*\n  Find the last row currently used in column A.\n\n  Column A contains the Job ID and therefore acts\n  as the reference column for row allocation.\n*/\nlet lastUsedRow = 0;\n\nfor (\n  let i = 0;\n  i < targetValues.length;\n  i++\n) {\n  const value =\n    String(\n      targetValues[i]?.[0] ?? ''\n    ).trim();\n\n  if (value) {\n    lastUsedRow = i + 1;\n  }\n}\n\n\n/*\n  Row 1 contains the header.\n\n  The first available data row is therefore row 2.\n*/\nconst nextRow =\n  Math.max(\n    lastUsedRow + 1,\n    2\n  );\n\n\n/*\n  Build the exact A:Y range where the new job\n  will be written if it passes the duplicate check.\n*/\nconst writeRange =\n  `${ctx.target_sheet}!A${nextRow}:Y${nextRow}`;\n\n\nreturn [{\n  json: {\n    ...ctx,\n\n    is_new:\n      currentId !== '' &&\n      !existingIds.has(currentId),\n\n    duplicate_checked_across_12_months:\n      true,\n\n    next_row:\n      nextRow,\n\n    write_range:\n      writeRange,\n\n    write_range_encoded:\n      encodeURIComponent(\n        writeRange\n      )\n  }\n}];"
+      },
+      "id": "2464ef7b-30d8-4d7b-b295-676eb835433e",
+      "name": "Check Duplicate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1584,
+        752
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "7ef9fecb-edce-4c5d-a63d-07b0929487de",
+              "leftValue": "={{ $json.is_new }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "2d820b90-a856-4202-ba87-1d6c56a36e93",
+      "name": "Is New Job?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1808,
+        752
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/YOUR_GOOGLE_SHEET_ID/values/{{ $json.write_range_encoded }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "valueInputOption",
+              "value": "USER_ENTERED"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { values: [ $json.row_values ] } }}",
+        "options": {}
+      },
+      "id": "82d4b945-3895-48b5-84cb-1502ba37f6f4",
+      "name": "Save New Job",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        3648,
+        496
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "gC5t4ydGzpTmYqDa",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{\n  json: {\n    job_id: $json.job_id,\n    target_sheet: $json.target_sheet,\n    saved: false,\n    reason: 'duplicate_job_id'\n  }\n}];"
+      },
+      "id": "65c89d4f-d1be-4e3b-b67d-8795ae56c181",
+      "name": "Skip Duplicate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2032,
+        768
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{\n  json: {\n    status: 'completed',\n    message:\n      'Job Saver finished. Job IDs were checked across all 12 monthly tabs.'\n  }\n}];"
+      },
+      "id": "f68b206c-fe7a-4450-b430-4a3ad0938273",
+      "name": "Save Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        912,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 3
+      },
+      "id": "354205b6-ad9b-42cc-96c5-2b7d21620d0d",
+      "name": "Wait 3 Seconds",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        912,
+        752
+      ],
+      "webhookId": "92819225-f36b-4fc1-a75f-99244bf569c8"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2032,
+        528
+      ],
+      "id": "31cf1c2c-5982-4d02-b24a-979b063bcfa9",
+      "name": "Fetch LinkedIn Job Page",
+      "retryOnFail": true,
+      "waitBetweenTries": 2000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const original =\n  $('Is New Job?').item.json ?? {};\n\nconst response =\n  $json ?? {};\n\nconst html =\n  typeof response.data === 'string'\n    ? response.data\n    : typeof response.body === 'string'\n      ? response.body\n      : '';\n\n\n// --------------------------------------------------\n// HELPERS\n// --------------------------------------------------\n\nfunction decodeHtml(text = '') {\n  return String(text)\n    .replace(/<br\\s*\\/?>/gi, '\\n')\n    .replace(/<\\/p>/gi, '\\n')\n    .replace(/<li[^>]*>/gi, '• ')\n    .replace(/<\\/li>/gi, '\\n')\n    .replace(/<[^>]+>/g, '')\n    .replace(/&nbsp;/gi, ' ')\n    .replace(/&amp;/gi, '&')\n    .replace(/&quot;/gi, '\"')\n    .replace(/&#39;/gi, \"'\")\n    .replace(/&lt;/gi, '<')\n    .replace(/&gt;/gi, '>')\n    .replace(/&#(\\d+);/g, (_, n) =>\n      String.fromCharCode(Number(n))\n    )\n    .replace(/\\r/g, '')\n    .replace(/[ \\t]+\\n/g, '\\n')\n    .replace(/\\n[ \\t]+/g, '\\n')\n    .replace(/\\n{3,}/g, '\\n\\n')\n    .replace(/[ \\t]{2,}/g, ' ')\n    .trim();\n}\n\n\n// --------------------------------------------------\n// DESCRIPTION\n// --------------------------------------------------\n\nfunction extractDescription(html) {\n  const match = html.match(\n    /<div[^>]*class=\"[^\"]*show-more-less-html__markup[^\"]*\"[^>]*>([\\s\\S]*?)<\\/div>/i\n  );\n\n  return match\n    ? decodeHtml(match[1])\n    : '';\n}\n\n\n// --------------------------------------------------\n// LINKEDIN CRITERIA\n// --------------------------------------------------\n\nfunction extractCriteria(html) {\n  const criteria = {};\n\n  const regex =\n    /<li[^>]*class=\"[^\"]*description__job-criteria-item[^\"]*\"[^>]*>([\\s\\S]*?)<\\/li>/gi;\n\n  let match;\n\n  while (\n    (match = regex.exec(html)) !== null\n  ) {\n    const block =\n      match[1];\n\n    const headerMatch =\n      block.match(\n        /<h3[^>]*class=\"[^\"]*description__job-criteria-subheader[^\"]*\"[^>]*>([\\s\\S]*?)<\\/h3>/i\n      );\n\n    const valueMatch =\n      block.match(\n        /<span[^>]*class=\"[^\"]*description__job-criteria-text[^\"]*\"[^>]*>([\\s\\S]*?)<\\/span>/i\n      );\n\n    if (\n      !headerMatch ||\n      !valueMatch\n    ) {\n      continue;\n    }\n\n    const key =\n      decodeHtml(\n        headerMatch[1]\n      );\n\n    const value =\n      decodeHtml(\n        valueMatch[1]\n      );\n\n    if (\n      key &&\n      value\n    ) {\n      criteria[key] =\n        value;\n    }\n  }\n\n  return criteria;\n}\n\n\n// --------------------------------------------------\n// TARGET JOB HTML ONLY\n// --------------------------------------------------\n\n/*\n  Keep only the section that belongs to the target job.\n\n  This prevents the parser from detecting Remote,\n  Hybrid, On-site, or other metadata from recommended\n  jobs displayed later on the LinkedIn page.\n*/\n\nfunction extractTargetJobHtml(html) {\n  const raw =\n    String(html || '');\n\n  const cutoffMarkers = [\n    'find-a-referral',\n    'people-also-viewed',\n    'base-aside-card',\n    'similar-jobs',\n  ];\n\n  let cutoff =\n    raw.length;\n\n  for (\n    const marker\n    of cutoffMarkers\n  ) {\n    const index =\n      raw.indexOf(marker);\n\n    if (\n      index !== -1 &&\n      index < cutoff\n    ) {\n      cutoff =\n        index;\n    }\n  }\n\n  return raw.slice(\n    0,\n    cutoff\n  );\n}\n\n\n// --------------------------------------------------\n// LANGUAGE\n// --------------------------------------------------\n\nfunction detectLanguage(text) {\n  const value =\n    String(text || '')\n      .toLowerCase()\n      .trim();\n\n  if (!value) {\n    return '';\n  }\n\n  const portugueseMarkers = [\n    'experiência',\n    'responsabilidades',\n    'requisitos',\n    'conhecimento',\n    'conhecimentos',\n    'desenvolvimento',\n    'trabalho',\n    'buscamos',\n    'empresa',\n    'equipe',\n    'pessoa',\n    'pessoas',\n    'vaga',\n    'tecnologia',\n    'engenharia',\n    'dados',\n    'soluções',\n    'projetos',\n    'oportunidade',\n    'inglês',\n    'habilidades',\n    'qualificações',\n    'atividades',\n    'benefícios',\n    'profissional',\n    'contribuir',\n    'liderança',\n    'ambiente',\n  ];\n\n  const englishMarkers = [\n    'experience',\n    'responsibilities',\n    'requirements',\n    'knowledge',\n    'development',\n    'work',\n    'looking for',\n    'company',\n    'team',\n    'candidate',\n    'technology',\n    'engineering',\n    'data',\n    'solutions',\n    'projects',\n    'opportunity',\n    'english',\n    'skills',\n    'qualifications',\n    'benefits',\n    'professional',\n    'leadership',\n    'environment',\n    'you will',\n    'we are',\n  ];\n\n  let portugueseScore = 0;\n  let englishScore = 0;\n\n  for (\n    const marker\n    of portugueseMarkers\n  ) {\n    if (\n      value.includes(marker)\n    ) {\n      portugueseScore++;\n    }\n  }\n\n  for (\n    const marker\n    of englishMarkers\n  ) {\n    if (\n      value.includes(marker)\n    ) {\n      englishScore++;\n    }\n  }\n\n  if (\n    portugueseScore >\n      englishScore &&\n    portugueseScore >= 2\n  ) {\n    return 'Portuguese';\n  }\n\n  if (\n    englishScore >\n      portugueseScore &&\n    englishScore >= 2\n  ) {\n    return 'English';\n  }\n\n  return '';\n}\n\n\n// --------------------------------------------------\n// TIME TYPE\n// --------------------------------------------------\n\nfunction detectTimeType(value) {\n  const text =\n    String(value || '')\n      .toLowerCase();\n\n  if (\n    text.includes(\n      'tempo integral'\n    ) ||\n    text.includes(\n      'full-time'\n    ) ||\n    text.includes(\n      'full time'\n    )\n  ) {\n    return 'Full-time';\n  }\n\n  if (\n    text.includes(\n      'meio período'\n    ) ||\n    text.includes(\n      'meio periodo'\n    ) ||\n    text.includes(\n      'part-time'\n    ) ||\n    text.includes(\n      'part time'\n    )\n  ) {\n    return 'Part-time';\n  }\n\n  return '';\n}\n\n\n// --------------------------------------------------\n// JOB TYPE\n// --------------------------------------------------\n\nfunction detectJobType(\n  employmentRaw,\n  description\n) {\n  const text =\n    `${\n      employmentRaw || ''\n    }\\n${\n      description || ''\n    }`\n      .toLowerCase();\n\n  const types = [];\n\n  /*\n    Add Job Type only when explicit evidence exists\n    in the job posting.\n\n    Full-time / Part-time are not Job Type values.\n    Junior does not imply Internship.\n  */\n\n  if (\n    /\\bclt\\b/i.test(text)\n  ) {\n    types.push('CLT');\n  }\n\n  if (\n    /\\bpj\\b/i.test(text) ||\n    /\\bpessoa jurídica\\b/i.test(text) ||\n    /\\bpessoa juridica\\b/i.test(text)\n  ) {\n    types.push('PJ');\n  }\n\n  if (\n    /\\bfreelance\\b/i.test(text) ||\n    /\\bfreelancer\\b/i.test(text)\n  ) {\n    types.push(\n      'Freelance'\n    );\n  }\n\n  /*\n    Internship is added only when there is explicit\n    evidence of estágio / internship.\n\n    Junior, Assistente, starting-career language,\n    learning opportunities, or mentorship are not\n    treated as Internship evidence.\n  */\n  if (\n    /\\bestágio\\b/i.test(text) ||\n    /\\bestagio\\b/i.test(text) ||\n    /\\binternship\\b/i.test(text)\n  ) {\n    types.push(\n      'Internship'\n    );\n  }\n\n  if (\n    /\\btemporário\\b/i.test(text) ||\n    /\\btemporario\\b/i.test(text) ||\n    /\\btemporária\\b/i.test(text) ||\n    /\\btemporaria\\b/i.test(text) ||\n    /\\btemporary\\b/i.test(text)\n  ) {\n    types.push(\n      'Temporary'\n    );\n  }\n\n  if (\n    /\\blong-term\\b/i.test(text) ||\n    /\\blong term\\b/i.test(text) ||\n    /\\blongo prazo\\b/i.test(text)\n  ) {\n    types.push(\n      'Long-term'\n    );\n  }\n\n  if (\n    /\\bcontract\\b/i.test(text) ||\n    /\\bcontractor\\b/i.test(text) ||\n    /\\bcontrato\\b/i.test(text)\n  ) {\n    types.push(\n      'Contract'\n    );\n  }\n\n  return [\n    ...new Set(types)\n  ].join(', ');\n}\n\n\n// --------------------------------------------------\n// EXPERIENCE — MULTI-SELECT\n// --------------------------------------------------\n\nfunction detectExperience(value) {\n  const text =\n    String(value || '')\n      .toLowerCase()\n      .trim();\n\n  if (!text) {\n    return '';\n  }\n\n  /*\n    LinkedIn may return combined seniority ranges such as:\n\n    Pleno-sênior\n    Pleno/Sênior\n    Mid-Senior\n    Mid/Senior\n\n    Because Experience is a multi-select field,\n    both levels are preserved.\n  */\n  const hasMid =\n    text.includes(\n      'pleno'\n    ) ||\n    /\\bmid\\b/i.test(text) ||\n    text.includes(\n      'mid-level'\n    ) ||\n    text.includes(\n      'mid level'\n    );\n\n  const hasSenior =\n    text.includes(\n      'sênior'\n    ) ||\n    text.includes(\n      'senior'\n    );\n\n  if (\n    hasMid &&\n    hasSenior\n  ) {\n    return 'Mid, Senior';\n  }\n\n  if (\n    /\\blead\\b/i.test(text) ||\n    text.includes(\n      'tech lead'\n    ) ||\n    text.includes(\n      'technical lead'\n    ) ||\n    text.includes(\n      'líder'\n    ) ||\n    text.includes(\n      'lider'\n    )\n  ) {\n    return 'Lead';\n  }\n\n  if (\n    text.includes(\n      'sênior'\n    ) ||\n    text.includes(\n      'senior'\n    )\n  ) {\n    return 'Senior';\n  }\n\n  if (\n    text.includes(\n      'especialista'\n    ) ||\n    text.includes(\n      'specialist'\n    )\n  ) {\n    return 'Specialist';\n  }\n\n  if (\n    text.includes(\n      'pleno'\n    ) ||\n    /\\bmid\\b/i.test(text) ||\n    text.includes(\n      'mid-level'\n    ) ||\n    text.includes(\n      'mid level'\n    )\n  ) {\n    return 'Mid';\n  }\n\n  /*\n    LinkedIn PT-BR may use \"Assistente\"\n    for entry-level positions.\n  */\n  if (\n    text.includes(\n      'assistente'\n    ) ||\n    text.includes(\n      'entry level'\n    ) ||\n    text.includes(\n      'entry-level'\n    ) ||\n    text.includes(\n      'associate'\n    )\n  ) {\n    return 'Junior';\n  }\n\n  if (\n    text.includes(\n      'júnior'\n    ) ||\n    text.includes(\n      'junior'\n    )\n  ) {\n    return 'Junior';\n  }\n\n  if (\n    text.includes(\n      'estágio'\n    ) ||\n    text.includes(\n      'estagio'\n    ) ||\n    /\\bintern\\b/i.test(text)\n  ) {\n    return 'Intern';\n  }\n\n  return '';\n}\n\n\n// --------------------------------------------------\n// WORK MODE\n// --------------------------------------------------\n\nfunction detectWorkMode(\n  targetHtml,\n  description\n) {\n  const scopedHtml =\n    String(\n      targetHtml || ''\n    );\n\n  const descriptionText =\n    String(\n      description || ''\n    );\n\n  /*\n    Analyze only the HTML that belongs to the target job.\n\n    Recommended or related jobs must never be used\n    as evidence for Work Mode.\n  */\n\n  const structuredPatterns = [\n    /\"workplaceType\"\\s*:\\s*\"([^\"]+)\"/i,\n    /\"workplaceTypes\"\\s*:\\s*\\[\\s*\"([^\"]+)\"/i,\n    /\"jobLocationType\"\\s*:\\s*\"([^\"]+)\"/i,\n  ];\n\n  for (\n    const pattern\n    of structuredPatterns\n  ) {\n    const match =\n      scopedHtml.match(\n        pattern\n      );\n\n    if (!match) {\n      continue;\n    }\n\n    const value =\n      String(\n        match[1] || ''\n      )\n        .toLowerCase()\n        .trim();\n\n    if (\n      value.includes(\n        'remote'\n      ) ||\n      value.includes(\n        'telecommute'\n      )\n    ) {\n      return 'Remote';\n    }\n\n    if (\n      value.includes(\n        'hybrid'\n      )\n    ) {\n      return 'Hybrid';\n    }\n\n    if (\n      value.includes(\n        'on-site'\n      ) ||\n      value.includes(\n        'onsite'\n      ) ||\n      value.includes(\n        'on_site'\n      )\n    ) {\n      return 'On-site';\n    }\n  }\n\n\n  // --------------------------------------------------\n  // EXPLICIT LABELS IN TARGET JOB HTML\n  // --------------------------------------------------\n\n  const visibleTargetText =\n    decodeHtml(\n      scopedHtml\n    )\n      .toLowerCase();\n\n  if (\n    /\\bhybrid\\b/i.test(\n      visibleTargetText\n    ) ||\n    /\\bhíbrido\\b/i.test(\n      visibleTargetText\n    ) ||\n    /\\bhibrido\\b/i.test(\n      visibleTargetText\n    )\n  ) {\n    return 'Hybrid';\n  }\n\n  if (\n    /\\bon-site\\b/i.test(\n      visibleTargetText\n    ) ||\n    /\\bonsite\\b/i.test(\n      visibleTargetText\n    ) ||\n    /\\bon site\\b/i.test(\n      visibleTargetText\n    ) ||\n    /\\bpresencial\\b/i.test(\n      visibleTargetText\n    )\n  ) {\n    return 'On-site';\n  }\n\n  if (\n    /\\b100%\\s*remote\\b/i.test(\n      visibleTargetText\n    ) ||\n    /\\bfully remote\\b/i.test(\n      visibleTargetText\n    ) ||\n    /\\bremote position\\b/i.test(\n      visibleTargetText\n    ) ||\n    /\\bremote role\\b/i.test(\n      visibleTargetText\n    ) ||\n    /\\b100%\\s*remot[oa]\\b/i.test(\n      visibleTargetText\n    ) ||\n    /\\bvaga remot[ae]\\b/i.test(\n      visibleTargetText\n    ) ||\n    /\\btrabalho remoto\\b/i.test(\n      visibleTargetText\n    )\n  ) {\n    return 'Remote';\n  }\n\n\n  // --------------------------------------------------\n  // JOB DESCRIPTION\n  // --------------------------------------------------\n\n  if (\n    /\\b(hybrid|híbrido|hibrido|híbrida|hibrida)\\b/i\n      .test(\n        descriptionText\n      )\n  ) {\n    return 'Hybrid';\n  }\n\n  if (\n    /\\b(on-site|onsite|on site|presencial)\\b/i\n      .test(\n        descriptionText\n      )\n  ) {\n    return 'On-site';\n  }\n\n  if (\n    /\\b(100%\\s*remot[oa]|fully remote|remote position|remote role|vaga remot[ae]|trabalho remoto|trabalhar remotamente)\\b/i\n      .test(\n        descriptionText\n      )\n  ) {\n    return 'Remote';\n  }\n\n  /*\n    If no explicit evidence exists, keep Work Mode empty.\n\n    Do not inherit the RSS search mode as confirmed\n    job-posting data.\n  */\n  return '';\n}\n\n\n// --------------------------------------------------\n// EXTRACTION\n// --------------------------------------------------\n\nconst description =\n  extractDescription(\n    html\n  );\n\nconst criteria =\n  extractCriteria(\n    html\n  );\n\nconst targetJobHtml =\n  extractTargetJobHtml(\n    html\n  );\n\n\nconst experienceRaw =\n  criteria[\n    'Nível de experiência'\n  ] ||\n  criteria[\n    'Nivel de experiência'\n  ] ||\n  criteria[\n    'Experience level'\n  ] ||\n  '';\n\n\nconst employmentRaw =\n  criteria[\n    'Tipo de emprego'\n  ] ||\n  criteria[\n    'Employment type'\n  ] ||\n  '';\n\n\nconst detectedLanguage =\n  detectLanguage(\n    description\n  );\n\n\nconst detectedTimeType =\n  detectTimeType(\n    employmentRaw\n  );\n\n\nconst detectedJobType =\n  detectJobType(\n    employmentRaw,\n    description\n  );\n\n\nconst detectedExperience =\n  detectExperience(\n    experienceRaw\n  );\n\n\nconst detectedWorkMode =\n  detectWorkMode(\n    targetJobHtml,\n    description\n  );\n\n\n// --------------------------------------------------\n// MERGE\n// --------------------------------------------------\n\nconst enriched = {\n  ...original,\n\n  /*\n    Preserve the Work Mode inherited from the search\n    feed only as internal diagnostic metadata.\n  */\n  search_work_mode:\n    original.work_mode ||\n    '',\n\n\n  /*\n    The final Work Mode receives a value only when\n    the job posting itself provides enough evidence.\n  */\n  work_mode:\n    detectedWorkMode ||\n    '',\n\n  work_mode_verified:\n    Boolean(\n      detectedWorkMode\n    ),\n\n\n  description:\n    description ||\n    original.description ||\n    '',\n\n\n  language:\n    detectedLanguage ||\n    original.language ||\n    '',\n\n\n  time_type:\n    detectedTimeType ||\n    original.time_type ||\n    '',\n\n\n  /*\n    CLT, PJ, Contract, Freelance, and other Job Type\n    values are populated only when explicit evidence\n    exists in the job posting.\n  */\n  job_type:\n    detectedJobType ||\n    original.job_type ||\n    '',\n\n\n  /*\n    Experience may contain multiple levels.\n\n    Example:\n    Pleno-sênior → Mid, Senior\n  */\n  experience:\n    detectedExperience ||\n    original.experience ||\n    '',\n};\n\n\n// --------------------------------------------------\n// GOOGLE SHEETS A:Y\n// --------------------------------------------------\n\nenriched.row_values = [\n  enriched.job_id,          // A - Job ID\n  enriched.status,          // B - Status\n  enriched.date_scraped,    // C - Date Scraped\n  enriched.source,          // D - Source\n  enriched.search_keyword,  // E - Search Keyword\n  enriched.date_posted,     // F - Date Posted\n  enriched.title,           // G - Title\n  enriched.work_mode,       // H - Work Mode\n  enriched.url,             // I - URL\n  enriched.company_name,    // J - Company Name\n  enriched.location,        // K - Location\n  enriched.description,     // L - Description\n  enriched.language,        // M - Language\n  enriched.payment,         // N - Payment\n  enriched.time_type,       // O - Time Type\n  enriched.job_type,        // P - Job Type\n  enriched.experience,      // Q - Experience\n  enriched.salary,          // R - Salary\n  enriched.match,           // S - Match\n  enriched.qualified,       // T - Qualified\n  enriched.cover_letter,    // U - Cover Letter\n  enriched.notes,           // V - Notes\n  enriched.interview_at,    // W - Interview At\n  enriched.invite_meet,     // X - Invite Meet\n  enriched.attended         // Y - Attended\n];\n\n\nreturn [{\n  json: enriched\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2336,
+        512
+      ],
+      "id": "f15c3b48-313c-4470-a63f-0c9a61086746",
+      "name": "Parse LinkedIn Job Page"
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "searchMethod": "query",
+        "queryString": "=mimeType = 'application/pdf' and trashed = false",
+        "limit": 1,
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "value": "YOUR_CV_ACTIVE_FOLDER_ID",
+            "mode": "id"
+          },
+          "whatToSearch": "files"
+        },
+        "options": {
+          "fields": [
+            "id",
+            "name",
+            "mimeType"
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -96,
+        736
+      ],
+      "id": "de0d99e7-2ae2-41f4-8cfb-3eaae539a4ea",
+      "name": "Find Active CV",
+      "executeOnce": true,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "aaVjoen2JAostV2F",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        96,
+        736
+      ],
+      "id": "ca1d573a-02e5-4aac-a2ce-74999b19d343",
+      "name": "Download Active CV",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "aaVjoen2JAostV2F",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        288,
+        736
+      ],
+      "id": "0098c81f-8eeb-4685-8e1b-45645ef2bc13",
+      "name": "Extract CV Text"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.ai_prompt }}",
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        3088,
+        512
+      ],
+      "id": "c689de44-dd8e-4218-8e13-00dfdee80420",
+      "name": "Basic LLM Chain",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-oss-20b",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        3088,
+        736
+      ],
+      "id": "5aeff1e5-1bb4-4031-869a-ec181f8d8ca7",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "OkSsedGBiEYRysZN",
+          "name": "Groq API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const job = $json ?? {};\n\n\n// --------------------------------------------------\n// 1. CANDIDATE CV\n// --------------------------------------------------\n\nconst cvNode =\n  $('Extract CV Text').first().json ?? {};\n\n\nconst rawCvText =\n  cvNode.text ??\n  cvNode.content ??\n  cvNode.data ??\n  cvNode.extractedText ??\n  '';\n\n\nconst cvText =\n  String(rawCvText)\n    .replace(/\\r/g, '')\n    .replace(/[ \\t]+/g, ' ')\n    .replace(/\\n{3,}/g, '\\n\\n')\n    .trim();\n\n\n// --------------------------------------------------\n// 2. JOB DESCRIPTION\n// --------------------------------------------------\n\nconst description =\n  String(\n    job.description ?? ''\n  )\n    .replace(/\\r/g, '')\n    .replace(/[ \\t]+/g, ' ')\n    .replace(/\\n{3,}/g, '\\n\\n')\n    .trim();\n\n\n// --------------------------------------------------\n// 3. AI PROMPT\n// --------------------------------------------------\n\nconst aiPrompt = `\nUse ONLY the job data provided below.\n\nDo not browse the web.\nDo not use external information.\nDo not invent missing information.\n\nYou have TWO tasks:\n\n1. Complete missing structured job fields ONLY when the answer\n   can be reliably supported by the job title, description,\n   criteria or already extracted job data.\n\n2. Evaluate the technical/professional MATCH between the job\n   and the candidate CV.\n\n\n==================================================\nGENERAL STRUCTURED FIELD RULES\n==================================================\n\nIMPORTANT:\n\n- Preserve every field that is already populated.\n- Only complete fields that are currently empty.\n- Never replace a populated parser value.\n- If the available job data does not reliably support an answer,\n  return an empty string \"\".\n- Do not guess.\n- Do not use assumptions about the country, company or candidate.\n\n\n==================================================\nWORK MODE\n==================================================\n\nAllowed:\n\nRemote\nHybrid\nOn-site\n\"\"\n\nOnly fill this field when the job data explicitly indicates:\n\nRemote\nRemoto\n100% Remote\nHybrid\nHíbrido\nOn-site\nOnsite\nPresencial\n\nNever infer work mode from:\n\n- city\n- country\n- office address\n- transportation benefits\n- company habits\n- absence of the word Remote\n\nIf there is no explicit evidence:\n\"\"\n\n\n==================================================\nLANGUAGE\n==================================================\n\nAllowed:\n\nEnglish\nPortuguese\n\"\"\n\nUse the main language of the vacancy when clear from the\njob content.\n\nDo not infer employment type from language.\n\n\n==================================================\nPAYMENT\n==================================================\n\nAllowed:\n\nHourly\nFixed-price\nWeekly\nMonthly\nAnnual\nNot specified\n\"\"\n\nOnly fill Payment when the job data explicitly supports the\npayment frequency or payment model.\n\nExamples:\n\nper hour / hourly => Hourly\nfixed price => Fixed-price\nper week / weekly => Weekly\nper month / monthly => Monthly\nper year / annual / yearly => Annual\n\nDo NOT infer Payment from:\n\n- CLT\n- PJ\n- Full-time\n- Part-time\n- Contract\n\nIf no reliable evidence exists:\n\"\"\n\n\n==================================================\nTIME TYPE\n==================================================\n\nAllowed:\n\nFull-time\nPart-time\n\"\"\n\nExamples:\n\nTempo integral => Full-time\nFull-time => Full-time\n\nMeio período => Part-time\nPart-time => Part-time\n\nIMPORTANT:\n\nFull-time and Part-time describe TIME TYPE.\n\nThey do NOT determine Job Type.\n\n\n==================================================\nJOB TYPE\n==================================================\n\nAllowed values:\n\nContract\nInternship\nFreelance\nTemporary\nPJ\nCLT\nLong-term\n\"\"\n\nMultiple values may be returned separated by comma and space\nONLY when multiple employment types are explicitly supported.\n\nVERY IMPORTANT:\n\nJob Type requires explicit evidence.\n\nDO NOT infer Job Type from:\n\n- Junior\n- Senior\n- Assistant / Assistente\n- entry-level\n- \"starting your career\"\n- \"learn in practice\"\n- training or mentorship\n- Full-time\n- Part-time\n- Portuguese language\n- Brazil location\n- company nationality\n- benefits\n- permanent-looking responsibilities\n- absence of another employment type\n\nInternship:\nUse ONLY when the vacancy explicitly says Internship, Intern,\nEstágio, Estagiário or Estagiária.\n\nA Junior role is NOT an Internship.\n\nCLT:\nUse ONLY when CLT is explicitly stated.\n\nPJ:\nUse ONLY when PJ or Pessoa Jurídica is explicitly stated.\n\nContract:\nUse ONLY when Contract, Contractor or Contrato is explicitly stated.\n\nFreelance:\nUse ONLY when Freelance or Freelancer is explicitly stated.\n\nTemporary:\nUse ONLY when Temporary, Temporário or Temporária is explicitly stated.\n\nLong-term:\nUse ONLY when the job explicitly describes a long-term\nengagement or long-term contract.\n\nIf employment type is not explicitly supported:\n\"\"\n\n\n==================================================\nEXPERIENCE\n==================================================\n\nAllowed values:\n\nSenior\nMid\nSpecialist\nJunior\nIntern\nLead\n\"\"\n\nIMPORTANT:\n\nExperience is a MULTI-SELECT field.\n\nWhen the vacancy explicitly covers more than one seniority level,\nreturn multiple allowed values separated by comma and space.\n\nExamples:\n\nPleno-sênior\nMid-Senior\nPleno/Sênior\nMid/Senior\n\n=> \"Mid, Senior\"\n\nPreserve the current value when already populated.\n\nIf missing, infer cautiously using:\n\n- explicit seniority\n- years requested\n- responsibilities\n- autonomy\n- architecture ownership\n- leadership scope\n- complexity\n\nUseful mappings:\n\nAssistente / entry-level => Junior\nJúnior / Junior => Junior\nPleno / Mid-level => Mid\nPleno-sênior / Mid-Senior => Mid, Senior\nSênior / Senior => Senior\nEspecialista / Specialist => Specialist\nLead / Tech Lead / Technical Lead => Lead\nEstágio / Intern => Intern\n\nDo NOT convert Junior into Intern unless the vacancy explicitly\nidentifies the role as an internship.\n\nIf multiple levels are explicitly supported, preserve all of them.\n\n\n==================================================\nSALARY\n==================================================\n\nPreserve the original currency and range when available.\n\nExamples:\n\nR$ 8.000 - R$ 10.000\nUSD 80,000 - 100,000\n€50,000\n\nIf salary is not explicitly available:\n\"\"\n\n\n==================================================\nMATCH RULES\n==================================================\n\nMATCH measures ONLY technical and professional compatibility.\n\nAllowed:\n\nHigh\nMedium\nLow\n\nDO NOT consider:\n\n- Remote / Hybrid / On-site\n- location\n- salary\n- employment model\n- whether the candidate personally wants the job\n- whether Qualified will later be Yeap or Nope\n\nMatch and work arrangement are completely independent.\n\nEvaluate in this order:\n\n1. Primary technical domain\n2. Core responsibilities\n3. Core technologies and skills\n4. Demonstrated projects / professional experience\n5. Seniority and real scope\n6. Years of experience\n\n\nHIGH\n\nUse High when:\n\n- the candidate strongly matches the primary domain;\n- most core responsibilities are supported;\n- several core technologies overlap;\n- demonstrated experience suggests the candidate can perform\n  most of the work;\n- remaining gaps are mostly secondary or learnable.\n\n\nMEDIUM\n\nUse Medium when:\n\n- the primary domain clearly matches;\n- several important technologies/responsibilities overlap;\n- but meaningful gaps remain in core areas, architecture,\n  infrastructure, production experience or scope.\n\nGeneric example:\n\nA candidate may match the main domain, core responsibilities,\nand several important technologies, while still missing some\nproduction infrastructure, architecture, or platform-specific\nexperience.\n\nThis should normally be Medium rather than automatically Low\nwhen the overlap is still meaningful.\n\n\nLOW\n\nUse Low only when:\n\n- the primary domain is substantially different;\n- most core responsibilities are unsupported;\n- overlap is superficial or peripheral;\n- or there is a major demonstrated gap in actual responsibility,\n  scope or seniority.\n\nMissing several individual technologies alone is NOT enough\nfor Low.\n\n\n==================================================\nYEARS OF EXPERIENCE\n==================================================\n\nYears are supporting evidence, not a rigid filter.\n\nA small difference between requested years and demonstrated\nrelevant experience should have limited impact when the CV\nclearly supports the required capability.\n\nA larger gap matters more when it also reflects a real gap in:\n\n- responsibility\n- complexity\n- autonomy\n- architecture\n- leadership\n- production experience\n\n\n==================================================\nCURRENT JOB DATA\n==================================================\n\nTitle:\n${job.title ?? ''}\n\nCompany:\n${job.company_name ?? ''}\n\nLocation:\n${job.location ?? ''}\n\nCurrent Work Mode:\n${job.work_mode ?? ''}\n\nCurrent Language:\n${job.language ?? ''}\n\nCurrent Payment:\n${job.payment ?? ''}\n\nCurrent Time Type:\n${job.time_type ?? ''}\n\nCurrent Job Type:\n${job.job_type ?? ''}\n\nCurrent Experience:\n${job.experience ?? ''}\n\nCurrent Salary:\n${job.salary ?? ''}\n\nDescription:\n\n${description}\n\n\n==================================================\nCANDIDATE CV\n==================================================\n\n${cvText}\n\n\n==================================================\nOUTPUT\n==================================================\n\nReturn ONLY valid JSON.\n\nNo markdown.\nNo explanation.\n\n{\n  \"work_mode\": \"\",\n  \"language\": \"\",\n  \"payment\": \"\",\n  \"time_type\": \"\",\n  \"job_type\": \"\",\n  \"experience\": \"\",\n  \"salary\": \"\",\n  \"match\": \"High\"\n}\n\nExperience may contain multiple values, for example:\n\n\"experience\": \"Mid, Senior\"\n\nThe match value MUST be exactly:\n\nHigh\nMedium\nLow\n`.trim();\n\n\n// --------------------------------------------------\n// 4. PREPARED JOB\n// --------------------------------------------------\n\nconst prepared = {\n  ...job,\n\n  // Match is always recalculated by the AI.\n  match: '',\n\n  // Human-in-the-loop field.\n  qualified: '',\n\n  // Generated later by Workflow 03.\n  cover_letter: '',\n\n  ai_prompt:\n    aiPrompt\n};\n\n\n// --------------------------------------------------\n// 5. GOOGLE SHEETS A:Y\n// --------------------------------------------------\n\nprepared.row_values = [\n\n  prepared.job_id ?? '',          // A - Job ID\n\n  prepared.status ?? '',          // B - Status\n\n  prepared.date_scraped ?? '',    // C - Date Scraped\n\n  prepared.source ?? '',          // D - Source\n\n  prepared.search_keyword ?? '',  // E - Search Keyword\n\n  prepared.date_posted ?? '',     // F - Date Posted\n\n  prepared.title ?? '',           // G - Title\n\n  prepared.work_mode ?? '',       // H - Work Mode\n\n  prepared.url ?? '',             // I - URL\n\n  prepared.company_name ?? '',    // J - Company Name\n\n  prepared.location ?? '',        // K - Location\n\n  prepared.description ?? '',     // L - Description\n\n  prepared.language ?? '',        // M - Language\n\n  prepared.payment ?? '',         // N - Payment\n\n  prepared.time_type ?? '',       // O - Time Type\n\n  prepared.job_type ?? '',        // P - Job Type\n\n  prepared.experience ?? '',      // Q - Experience\n\n  prepared.salary ?? '',          // R - Salary\n\n  prepared.match ?? '',           // S - Match\n\n  prepared.qualified ?? '',       // T - Qualified\n\n  prepared.cover_letter ?? '',    // U - Cover Letter\n\n  prepared.notes ?? '',           // V - Notes\n\n  prepared.interview_at ?? '',    // W - Interview At\n\n  prepared.invite_meet ?? '',     // X - Invite Meet\n\n  prepared.attended ?? false      // Y - Attended\n];\n\n\nreturn {\n  json: prepared\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2720,
+        512
+      ],
+      "id": "d7646c69-e03d-4ea1-a93c-2d51418132a8",
+      "name": "Prepare AI Input"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const job =\n  $('Prepare AI Input').item.json ?? {};\n\n\nconst rawText =\n  $json?.text ??\n  $json?.output ??\n  $json?.response ??\n  '';\n\n\n// --------------------------------------------------\n// 1. PARSE JSON\n// --------------------------------------------------\n\nlet ai = {};\n\nlet parseFailed =\n  false;\n\n\nif (\n  typeof rawText === 'string' &&\n  rawText.trim()\n) {\n  try {\n    let cleaned =\n      rawText\n        .trim()\n        .replace(\n          /^```json\\s*/i,\n          ''\n        )\n        .replace(\n          /^```\\s*/i,\n          ''\n        )\n        .replace(\n          /\\s*```$/i,\n          ''\n        )\n        .trim();\n\n\n    const firstBrace =\n      cleaned.indexOf('{');\n\n    const lastBrace =\n      cleaned.lastIndexOf('}');\n\n\n    if (\n      firstBrace !== -1 &&\n      lastBrace !== -1\n    ) {\n      cleaned =\n        cleaned.slice(\n          firstBrace,\n          lastBrace + 1\n        );\n    }\n\n\n    ai =\n      JSON.parse(cleaned);\n\n  } catch {\n    parseFailed =\n      true;\n\n    ai = {};\n  }\n\n} else {\n  parseFailed =\n    true;\n}\n\n\n// --------------------------------------------------\n// 2. HELPERS\n// --------------------------------------------------\n\nconst isEmpty =\n  value =>\n    value === undefined ||\n    value === null ||\n    String(value).trim() === '';\n\n\nconst clean =\n  value =>\n    typeof value === 'string'\n      ? value.trim()\n      : '';\n\n\nconst validateSingle =\n  (\n    value,\n    allowed\n  ) => {\n    const normalized =\n      clean(value);\n\n    return allowed.includes(\n      normalized\n    )\n      ? normalized\n      : '';\n  };\n\n\nconst validateMulti =\n  (\n    value,\n    allowed\n  ) => {\n    const normalized =\n      clean(value);\n\n    if (!normalized) {\n      return '';\n    }\n\n\n    const values =\n      normalized\n        .split(/[,;|/]/)\n        .map(\n          item =>\n            item.trim()\n        )\n        .filter(Boolean);\n\n\n    const valid = [\n      ...new Set(\n        values.filter(\n          item =>\n            allowed.includes(item)\n        )\n      ),\n    ];\n\n\n    return valid.join(', ');\n  };\n\n\n// --------------------------------------------------\n// 3. ALLOWED VALUES\n// --------------------------------------------------\n\nconst WORK_MODES = [\n  'Remote',\n  'Hybrid',\n  'On-site',\n];\n\n\nconst LANGUAGES = [\n  'English',\n  'Portuguese',\n];\n\n\nconst PAYMENTS = [\n  'Hourly',\n  'Fixed-price',\n  'Weekly',\n  'Monthly',\n  'Annual',\n  'Not specified',\n];\n\n\nconst TIME_TYPES = [\n  'Full-time',\n  'Part-time',\n];\n\n\nconst JOB_TYPES = [\n  'Contract',\n  'Internship',\n  'Freelance',\n  'Temporary',\n  'PJ',\n  'CLT',\n  'Long-term',\n];\n\n\nconst EXPERIENCES = [\n  'Senior',\n  'Mid',\n  'Specialist',\n  'Junior',\n  'Intern',\n  'Lead',\n];\n\n\nconst MATCHES = [\n  'High',\n  'Medium',\n  'Low',\n];\n\n\n// --------------------------------------------------\n// 4. VALIDATE AI VALUES\n// --------------------------------------------------\n\nconst aiWorkMode =\n  validateSingle(\n    ai.work_mode,\n    WORK_MODES\n  );\n\n\nconst aiLanguage =\n  validateSingle(\n    ai.language,\n    LANGUAGES\n  );\n\n\nconst aiPayment =\n  validateMulti(\n    ai.payment,\n    PAYMENTS\n  );\n\n\nconst aiTimeType =\n  validateSingle(\n    ai.time_type,\n    TIME_TYPES\n  );\n\n\nconst aiJobType =\n  validateMulti(\n    ai.job_type,\n    JOB_TYPES\n  );\n\n\n/*\n  Experience is a multi-select field.\n\n  Example:\n  \"Mid, Senior\"\n*/\nconst aiExperience =\n  validateMulti(\n    ai.experience,\n    EXPERIENCES\n  );\n\n\nconst aiSalary =\n  clean(\n    ai.salary\n  );\n\n\nconst aiMatch =\n  validateSingle(\n    ai.match,\n    MATCHES\n  );\n\n\n// --------------------------------------------------\n// 5. MERGE\n// --------------------------------------------------\n\nconst enriched = {\n  ...job,\n\n\n  /*\n    Preserve deterministic values already extracted\n    by the parser.\n\n    AI is allowed to fill only empty fields.\n  */\n  work_mode:\n    isEmpty(job.work_mode) &&\n    aiWorkMode\n      ? aiWorkMode\n      : job.work_mode ?? '',\n\n\n  language:\n    isEmpty(job.language) &&\n    aiLanguage\n      ? aiLanguage\n      : job.language ?? '',\n\n\n  payment:\n    isEmpty(job.payment) &&\n    aiPayment\n      ? aiPayment\n      : job.payment ?? '',\n\n\n  time_type:\n    isEmpty(job.time_type) &&\n    aiTimeType\n      ? aiTimeType\n      : job.time_type ?? '',\n\n\n  job_type:\n    isEmpty(job.job_type) &&\n    aiJobType\n      ? aiJobType\n      : job.job_type ?? '',\n\n\n  experience:\n    isEmpty(job.experience) &&\n    aiExperience\n      ? aiExperience\n      : job.experience ?? '',\n\n\n  salary:\n    isEmpty(job.salary) &&\n    aiSalary\n      ? aiSalary\n      : job.salary ?? '',\n\n\n  /*\n    Match is always produced by the AI evaluation.\n  */\n  match:\n    aiMatch,\n\n\n  /*\n    These fields belong to later human/application stages.\n  */\n  qualified:\n    '',\n\n  cover_letter:\n    '',\n\n\n  /*\n    Diagnostic metadata.\n\n    If parsing fails, the job can still be saved\n    without losing deterministic data.\n  */\n  ai_parse_failed:\n    parseFailed,\n};\n\n\ndelete enriched.ai_prompt;\n\n\n// --------------------------------------------------\n// 6. GOOGLE SHEETS A:Y\n// --------------------------------------------------\n\nenriched.row_values = [\n\n  enriched.job_id ?? '',          // A - Job ID\n\n  enriched.status ?? '',          // B - Status\n\n  enriched.date_scraped ?? '',    // C - Date Scraped\n\n  enriched.source ?? '',          // D - Source\n\n  enriched.search_keyword ?? '',  // E - Search Keyword\n\n  enriched.date_posted ?? '',     // F - Date Posted\n\n  enriched.title ?? '',           // G - Title\n\n  enriched.work_mode ?? '',       // H - Work Mode\n\n  enriched.url ?? '',             // I - URL\n\n  enriched.company_name ?? '',    // J - Company Name\n\n  enriched.location ?? '',        // K - Location\n\n  enriched.description ?? '',     // L - Description\n\n  enriched.language ?? '',        // M - Language\n\n  enriched.payment ?? '',         // N - Payment\n\n  enriched.time_type ?? '',       // O - Time Type\n\n  enriched.job_type ?? '',        // P - Job Type\n\n  enriched.experience ?? '',      // Q - Experience\n\n  enriched.salary ?? '',          // R - Salary\n\n  enriched.match ?? '',           // S - Match\n\n  enriched.qualified ?? '',       // T - Qualified\n\n  enriched.cover_letter ?? '',    // U - Cover Letter\n\n  enriched.notes ?? '',           // V - Notes\n\n  enriched.interview_at ?? '',    // W - Interview At\n\n  enriched.invite_meet ?? '',     // X - Invite Meet\n\n  enriched.attended ?? false      // Y - Attended\n];\n\n\nreturn {\n  json: enriched\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3456,
+        496
+      ],
+      "id": "bb68e03f-8d0a-4ab8-b8f7-39d3becbbaae",
+      "name": "Parse AI Result"
+    },
+    {
+      "parameters": {
+        "jsCode": "// The active CV was loaded only once.\n//\n// Now restore all original job items produced by\n// Format Jobs so the loop can process them individually.\n\nreturn $('Format Jobs').all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        464,
+        736
+      ],
+      "id": "72f66bee-9c05-4c71-88b5-7f54e0ed1624",
+      "name": "Restore Jobs After CV Load"
+    },
+    {
+      "parameters": {
+        "amount": 60
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2912,
+        512
+      ],
+      "id": "51a9af5b-97a4-413e-b35e-f32876e56152",
+      "name": "Groq Rate Gate",
+      "webhookId": "40f06794-30da-44d2-9241-60092cb1bb31"
+    },
+    {
+      "parameters": {
+        "jsCode": "const jobs = $input.all();\n\n\nfunction normalize(value = '') {\n  return String(value)\n    .replace(/\\r/g, '')\n    .replace(/\\u00a0/g, ' ')\n    .replace(/[ \\t]+/g, ' ')\n    .replace(/\\n{3,}/g, '\\n\\n')\n    .trim();\n}\n\n\nfunction normalizedMatch(value = '') {\n  return String(value)\n    .normalize('NFD')\n    .replace(/[\\u0300-\\u036f]/g, '')\n    .toLowerCase()\n    .trim();\n}\n\n\nfunction unique(values = []) {\n  const seen = new Set();\n\n  return values.filter(value => {\n    const key =\n      normalizedMatch(value)\n        .replace(\n          /[^\\p{L}\\p{N}]+/gu,\n          ' '\n        )\n        .trim();\n\n    if (\n      !key ||\n      seen.has(key)\n    ) {\n      return false;\n    }\n\n    seen.add(key);\n\n    return true;\n  });\n}\n\n\n// --------------------------------------------------\n// SECTION HEADINGS\n// --------------------------------------------------\n\nfunction detectSection(line) {\n  const text =\n    normalizedMatch(line)\n      .replace(\n        /[:\\-–—]+$/g,\n        ''\n      )\n      .trim();\n\n\n  const responsibilities = [\n    'responsibilities',\n    'responsabilidades',\n    'what you will do',\n    \"what you'll do\",\n    'your role',\n    'seu papel',\n    'dia a dia',\n    'o que voce fara',\n    'atividades'\n  ];\n\n\n  const requirements = [\n    'requirements',\n    'requisitos',\n    'qualifications',\n    'qualificacoes',\n    'what we are looking for',\n    \"what we're looking for\",\n    'o que buscamos',\n    'quem buscamos',\n    'perfil desejado'\n  ];\n\n\n  const preferred = [\n    'nice to have',\n    'preferred qualifications',\n    'preferred',\n    'diferenciais',\n    'diferencial',\n    'desejavel',\n    'desejaveis',\n    'bonus',\n    'plus'\n  ];\n\n\n  const ignore = [\n    'about us',\n    'sobre nos',\n    'quem somos',\n    'our culture',\n    'nossa cultura',\n    'benefits',\n    'beneficios',\n    'diversity',\n    'diversidade',\n    'inclusion',\n    'inclusao',\n    'equal opportunity',\n    'privacy',\n    'privacy policy',\n    'politica de privacidade'\n  ];\n\n\n  if (\n    responsibilities.includes(text)\n  ) {\n    return 'responsibilities';\n  }\n\n\n  if (\n    requirements.includes(text)\n  ) {\n    return 'requirements';\n  }\n\n\n  if (\n    preferred.includes(text)\n  ) {\n    return 'preferred';\n  }\n\n\n  if (\n    ignore.includes(text)\n  ) {\n    return 'ignore';\n  }\n\n\n  return null;\n}\n\n\n// --------------------------------------------------\n// GENERIC CORPORATE BOILERPLATE\n// --------------------------------------------------\n\nfunction isCorporateFluff(line) {\n  const text =\n    normalizedMatch(line);\n\n\n  const patterns = [\n    /\\bsobre nos\\b/,\n    /\\babout us\\b/,\n    /\\bquem somos\\b/,\n    /\\bvem fazer parte\\b/,\n    /\\bjoin our team\\b/,\n    /\\bessa e sua oportunidade\\b/,\n    /\\bse voce se identifica\\b/,\n    /\\bapaixonad[oa] por inovacao\\b/,\n    /\\bdiversidade\\b/,\n    /\\bdiversity\\b/,\n    /\\binclusao\\b/,\n    /\\binclusion\\b/,\n    /\\bequal opportunity\\b/,\n    /\\bequal opportunity employer\\b/,\n    /\\bprivacy policy\\b/,\n    /\\bpolitica de privacidade\\b/,\n    /\\bref\\.\\s*\\d+\\b/\n  ];\n\n\n  return patterns.some(\n    pattern =>\n      pattern.test(text)\n  );\n}\n\n\n// --------------------------------------------------\n// TECHNOLOGIES / SKILLS\n// --------------------------------------------------\n\nconst techPatterns = [\n\n  ['Python', /\\bpython\\b/i],\n\n  [\n    'JavaScript',\n    /\\bjavascript\\b|\\bjs\\b/i\n  ],\n\n  [\n    'TypeScript',\n    /\\btypescript\\b/i\n  ],\n\n  [\n    'SQL',\n    /\\bsql\\b/i\n  ],\n\n  [\n    'PostgreSQL',\n    /\\bpostgres(?:ql)?\\b/i\n  ],\n\n  [\n    'Supabase',\n    /\\bsupabase\\b/i\n  ],\n\n  [\n    'n8n',\n    /\\bn8n\\b/i\n  ],\n\n  [\n    'REST APIs',\n    /\\brest(?:ful)?\\b|\\bapis?\\b/i\n  ],\n\n  [\n    'GraphQL',\n    /\\bgraphql\\b/i\n  ],\n\n  [\n    'RAG',\n    /\\brag\\b/i\n  ],\n\n  [\n    'LLMs',\n    /\\bllms?\\b|\\blarge language models?\\b/i\n  ],\n\n  [\n    'Generative AI',\n    /\\bgenerative ai\\b|\\bgenai\\b/i\n  ],\n\n  [\n    'AI Agents',\n    /\\bai agents?\\b|\\bagentes? de ia\\b/i\n  ],\n\n  [\n    'Tool Calling',\n    /\\btool calling\\b/i\n  ],\n\n  [\n    'Prompt Engineering',\n    /\\bprompt engineering\\b/i\n  ],\n\n  [\n    'LangChain',\n    /\\blangchain\\b/i\n  ],\n\n  [\n    'LangGraph',\n    /\\blanggraph\\b/i\n  ],\n\n  [\n    'Embeddings',\n    /\\bembeddings?\\b/i\n  ],\n\n  [\n    'Vector Database',\n    /\\bvector database\\b|\\bvector db\\b/i\n  ],\n\n  [\n    'pgvector',\n    /\\bpgvector\\b/i\n  ],\n\n  [\n    'Pinecone',\n    /\\bpinecone\\b/i\n  ],\n\n  [\n    'MCP',\n    /\\bmcp\\b/i\n  ],\n\n  [\n    'OpenAI',\n    /\\bopenai\\b/i\n  ],\n\n  [\n    'Anthropic',\n    /\\banthropic\\b|\\bclaude\\b/i\n  ],\n\n  [\n    'Groq',\n    /\\bgroq\\b/i\n  ],\n\n  [\n    'Gemini',\n    /\\bgemini\\b/i\n  ],\n\n  [\n    'Machine Learning',\n    /\\bmachine learning\\b|\\bml\\b/i\n  ],\n\n  [\n    'MLOps',\n    /\\bmlops\\b/i\n  ],\n\n  [\n    'CI/CD',\n    /\\bci\\/cd\\b/i\n  ],\n\n  [\n    'Docker',\n    /\\bdocker\\b/i\n  ],\n\n  [\n    'Kubernetes',\n    /\\bkubernetes\\b|\\bk8s\\b/i\n  ],\n\n  [\n    'AWS',\n    /\\baws\\b/i\n  ],\n\n  [\n    'Azure',\n    /\\bazure\\b/i\n  ],\n\n  [\n    'GCP',\n    /\\bgcp\\b|\\bgoogle cloud\\b/i\n  ],\n\n  [\n    'Git',\n    /\\bgit\\b/i\n  ],\n\n  [\n    'GitHub',\n    /\\bgithub\\b/i\n  ],\n\n  [\n    'Linux',\n    /\\blinux\\b/i\n  ],\n\n  [\n    'Playwright',\n    /\\bplaywright\\b/i\n  ],\n\n  [\n    'Pandas',\n    /\\bpandas\\b/i\n  ],\n\n  [\n    'Streamlit',\n    /\\bstreamlit\\b/i\n  ],\n\n  [\n    'FinOps',\n    /\\bfinops\\b/i\n  ],\n\n  [\n    'Guardrails',\n    /\\bguardrails?\\b/i\n  ],\n\n  [\n    'Evals',\n    /\\bevals?\\b|\\bevaluations?\\b/i\n  ],\n\n  [\n    'Observability',\n    /\\bobservability\\b|\\bobservabilidade\\b/i\n  ],\n\n  [\n    'Model Governance',\n    /\\bmodel governance\\b|\\bgovernanca de modelos\\b|\\bgovernança de modelos\\b/i\n  ],\n\n  [\n    'Responsible AI',\n    /\\bresponsible ai\\b|\\bia responsavel\\b|\\bia responsável\\b/i\n  ]\n];\n\n\nfunction extractTechnologies(\n  description\n) {\n  const found = [];\n\n  for (\n    const [name, regex]\n    of techPatterns\n  ) {\n    if (\n      regex.test(description)\n    ) {\n      found.push(name);\n    }\n  }\n\n  return unique(found)\n    .slice(0, 20);\n}\n\n\n// --------------------------------------------------\n// FALLBACK SCORING\n// --------------------------------------------------\n\nfunction requirementScore(value) {\n  const text =\n    normalizedMatch(value);\n\n  let score = 0;\n\n\n  if (\n    /\\b(require|required|requirements?|must have|mandatory|qualification|qualificacao|experiencia|experience)\\b/\n      .test(text)\n  ) {\n    score += 5;\n  }\n\n\n  if (\n    /\\b\\d+\\+?\\s*(?:years?|anos?)\\b/\n      .test(text)\n  ) {\n    score += 4;\n  }\n\n\n  if (\n    /\\b(english|ingles|portuguese|portugues)\\b/\n      .test(text)\n  ) {\n    score += 3;\n  }\n\n\n  if (\n    techPatterns.some(\n      ([, regex]) =>\n        regex.test(value)\n    )\n  ) {\n    score += 2;\n  }\n\n\n  return score;\n}\n\n\nfunction responsibilityScore(value) {\n  const text =\n    normalizedMatch(value);\n\n  let score = 0;\n\n\n  if (\n    /\\b(design|develop|build|implement|lead|manage|mentor|architect|define|create|integrat|automat|deploy|monitor|projetar|desenvolver|construir|implementar|liderar|gerenciar|mentorar|definir|criar)\\b/\n      .test(text)\n  ) {\n    score += 4;\n  }\n\n\n  if (\n    techPatterns.some(\n      ([, regex]) =>\n        regex.test(value)\n    )\n  ) {\n    score += 2;\n  }\n\n\n  return score;\n}\n\n\nfunction topScored(\n  values,\n  scorer,\n  limit\n) {\n  return values\n    .map(\n      (value, index) => ({\n        value,\n        index,\n        score:\n          scorer(value)\n      })\n    )\n    .filter(\n      item =>\n        item.score > 0\n    )\n    .sort(\n      (a, b) =>\n        b.score -\n          a.score ||\n        a.index -\n          b.index\n    )\n    .slice(\n      0,\n      limit\n    )\n    .map(\n      item =>\n        item.value\n    );\n}\n\n\n// --------------------------------------------------\n// COMPACT DESCRIPTION BUILDER\n// --------------------------------------------------\n\nfunction buildCompactDescription(\n  description\n) {\n  const original =\n    normalize(description);\n\n  if (!original) {\n    return '';\n  }\n\n\n  const blocks =\n    original\n      .split(/\\n{2,}/)\n      .map(\n        block =>\n          block.trim()\n      )\n      .filter(Boolean);\n\n\n  const sections = {\n    responsibilities: [],\n    requirements: [],\n    preferred: [],\n    general: []\n  };\n\n\n  let currentSection =\n    null;\n\n\n  for (\n    const block\n    of blocks\n  ) {\n    const detected =\n      detectSection(block);\n\n\n    if (detected) {\n      currentSection =\n        detected;\n\n      continue;\n    }\n\n\n    if (\n      currentSection ===\n      'ignore'\n    ) {\n      continue;\n    }\n\n\n    /*\n      When the parser is inside an explicit section,\n      preserve useful content from that section.\n    */\n    if (\n      currentSection ===\n        'responsibilities' ||\n      currentSection ===\n        'requirements' ||\n      currentSection ===\n        'preferred'\n    ) {\n      const cleaned =\n        block\n          .replace(\n            /^[•●▪◦*-]\\s*/,\n            ''\n          )\n          .trim();\n\n\n      if (\n        cleaned &&\n        !isCorporateFluff(\n          cleaned\n        )\n      ) {\n        sections[\n          currentSection\n        ].push(\n          cleaned\n        );\n      }\n\n\n      continue;\n    }\n\n\n    /*\n      Content outside explicit sections is preserved\n      only as general fallback material.\n\n      Deterministic scoring later decides whether\n      it contains useful technical information.\n    */\n    if (\n      !isCorporateFluff(\n        block\n      )\n    ) {\n      sections.general.push(\n        block\n      );\n    }\n  }\n\n\n  let responsibilities =\n    unique(\n      sections.responsibilities\n    );\n\n\n  let requirements =\n    unique(\n      sections.requirements\n    );\n\n\n  let preferred =\n    unique(\n      sections.preferred\n    );\n\n\n  /*\n    If the job description does not contain clear\n    headings, deterministic scoring selects the most\n    relevant responsibility-like blocks.\n  */\n  if (\n    !responsibilities.length\n  ) {\n    responsibilities =\n      topScored(\n        sections.general,\n        responsibilityScore,\n        6\n      );\n  }\n\n\n  /*\n    Apply the same deterministic fallback strategy\n    for requirements.\n  */\n  if (\n    !requirements.length\n  ) {\n    requirements =\n      topScored(\n        sections.general,\n        requirementScore,\n        7\n      );\n  }\n\n\n  /*\n    Safety limits keep the compact description small\n    enough to reduce downstream LLM token usage.\n  */\n  responsibilities =\n    responsibilities.slice(\n      0,\n      7\n    );\n\n\n  requirements =\n    requirements.slice(\n      0,\n      8\n    );\n\n\n  preferred =\n    preferred.slice(\n      0,\n      5\n    );\n\n\n  const technologies =\n    extractTechnologies(\n      original\n    );\n\n\n  const output = [];\n\n\n  if (\n    responsibilities.length\n  ) {\n    output.push(\n      'RESPONSIBILITIES:\\n' +\n      responsibilities\n        .map(\n          value =>\n            `• ${value}`\n        )\n        .join('\\n')\n    );\n  }\n\n\n  if (\n    requirements.length\n  ) {\n    output.push(\n      'REQUIREMENTS:\\n' +\n      requirements\n        .map(\n          value =>\n            `• ${value}`\n        )\n        .join('\\n')\n    );\n  }\n\n\n  if (\n    technologies.length\n  ) {\n    output.push(\n      'TECH / SKILLS:\\n' +\n      technologies.join(', ')\n    );\n  }\n\n\n  if (\n    preferred.length\n  ) {\n    output.push(\n      'NICE TO HAVE:\\n' +\n      preferred\n        .map(\n          value =>\n            `• ${value}`\n        )\n        .join('\\n')\n    );\n  }\n\n\n  /*\n    Final fallback when no structured section could\n    be generated.\n  */\n  if (\n    !output.length\n  ) {\n    return sections.general\n      .slice(\n        0,\n        8\n      )\n      .map(\n        value =>\n          `• ${value}`\n      )\n      .join('\\n');\n  }\n\n\n  return output.join(\n    '\\n\\n'\n  );\n}\n\n\n// --------------------------------------------------\n// OUTPUT\n// --------------------------------------------------\n\nreturn jobs.map(item => {\n  const job =\n    item.json ?? {};\n\n\n  const compactDescription =\n    buildCompactDescription(\n      job.description ?? ''\n    );\n\n\n  const updatedJob = {\n    ...job,\n\n    description:\n      compactDescription ||\n      job.description ||\n      ''\n  };\n\n\n  /*\n    Keep row_values synchronized with the updated\n    compact Description when the array already exists.\n\n    Column L corresponds to index 11.\n  */\n  if (\n    Array.isArray(\n      job.row_values\n    )\n  ) {\n    updatedJob.row_values = [\n      ...job.row_values\n    ];\n\n    updatedJob.row_values[11] =\n      updatedJob.description;\n  }\n\n\n  return {\n    json:\n      updatedJob\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2528,
+        512
+      ],
+      "id": "550cf40d-96fd-4be0-a9ec-d366f8fdba25",
+      "name": "Compact Job Description"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "/*\n  Recover the complete job prepared before\n  the AI Match analysis.\n*/\nconst job =\n  $('Prepare AI Input').item.json ?? {};\n\n\n/*\n  Error payload received from the Basic LLM Chain.\n*/\nconst errorItem =\n  $json ?? {};\n\n\n// --------------------------------------------------\n// 1. CAPTURE ERROR MESSAGE\n// --------------------------------------------------\n\nconst errorMessage =\n  errorItem?.error?.message ??\n  errorItem?.message ??\n  errorItem?.errorMessage ??\n  'AI Match request failed after retries';\n\n\n// --------------------------------------------------\n// 2. PRESERVE JOB WITHOUT INVENTING MATCH\n// --------------------------------------------------\n\nconst enriched = {\n  ...job,\n\n  /*\n    The AI request failed, so Match remains empty.\n\n    The workflow must never invent a Match value\n    when semantic evaluation was not completed.\n  */\n  match: '',\n\n  /*\n    Human-in-the-loop field.\n  */\n  qualified: '',\n\n  /*\n    Generated later by Workflow 03 after\n    the job is manually qualified.\n  */\n  cover_letter: '',\n\n  /*\n    Internal diagnostic metadata.\n\n    These fields are not written to Google Sheets.\n  */\n  ai_match_failed:\n    true,\n\n  ai_match_error:\n    String(\n      errorMessage\n    ),\n};\n\n\n/*\n  The AI prompt is no longer needed downstream\n  and should not remain attached to the job object.\n*/\ndelete enriched.ai_prompt;\n\n\n// --------------------------------------------------\n// 3. REBUILD GOOGLE SHEETS A:Y\n// --------------------------------------------------\n\nenriched.row_values = [\n\n  enriched.job_id ?? '',          // A - Job ID\n\n  enriched.status ?? '',          // B - Status\n\n  enriched.date_scraped ?? '',    // C - Date Scraped\n\n  enriched.source ?? '',          // D - Source\n\n  enriched.search_keyword ?? '',  // E - Search Keyword\n\n  enriched.date_posted ?? '',     // F - Date Posted\n\n  enriched.title ?? '',           // G - Title\n\n  enriched.work_mode ?? '',       // H - Work Mode\n\n  enriched.url ?? '',             // I - URL\n\n  enriched.company_name ?? '',    // J - Company Name\n\n  enriched.location ?? '',        // K - Location\n\n  enriched.description ?? '',     // L - Description\n\n  enriched.language ?? '',        // M - Language\n\n  enriched.payment ?? '',         // N - Payment\n\n  enriched.time_type ?? '',       // O - Time Type\n\n  enriched.job_type ?? '',        // P - Job Type\n\n  enriched.experience ?? '',      // Q - Experience\n\n  enriched.salary ?? '',          // R - Salary\n\n  enriched.match ?? '',           // S - Match\n\n  enriched.qualified ?? '',       // T - Qualified\n\n  enriched.cover_letter ?? '',    // U - Cover Letter\n\n  enriched.notes ?? '',           // V - Notes\n\n  enriched.interview_at ?? '',    // W - Interview At\n\n  enriched.invite_meet ?? '',     // X - Invite Meet\n\n  enriched.attended ?? false      // Y - Attended\n];\n\n\nreturn {\n  json: enriched\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3456,
+        704
+      ],
+      "id": "70d9e36b-4e38-4f52-beb2-44b93cfa049c",
+      "name": "Handle AI Failure"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Receive Jobs": {
+      "main": [
+        [
+          {
+            "node": "Format Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Jobs": {
+      "main": [
+        [
+          {
+            "node": "Find Active CV",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Jobs": {
+      "main": [
+        [
+          {
+            "node": "Save Summary",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait 3 Seconds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Monthly Row": {
+      "main": [
+        [
+          {
+            "node": "Check Job IDs - All Months",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Job IDs - All Months": {
+      "main": [
+        [
+          {
+            "node": "Check Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Duplicate": {
+      "main": [
+        [
+          {
+            "node": "Is New Job?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is New Job?": {
+      "main": [
+        [
+          {
+            "node": "Fetch LinkedIn Job Page",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Skip Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save New Job": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Skip Duplicate": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 3 Seconds": {
+      "main": [
+        [
+          {
+            "node": "Prepare Monthly Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch LinkedIn Job Page": {
+      "main": [
+        [
+          {
+            "node": "Parse LinkedIn Job Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse LinkedIn Job Page": {
+      "main": [
+        [
+          {
+            "node": "Compact Job Description",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Active CV": {
+      "main": [
+        [
+          {
+            "node": "Download Active CV",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Active CV": {
+      "main": [
+        [
+          {
+            "node": "Extract CV Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract CV Text": {
+      "main": [
+        [
+          {
+            "node": "Restore Jobs After CV Load",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare AI Input": {
+      "main": [
+        [
+          {
+            "node": "Groq Rate Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle AI Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI Result": {
+      "main": [
+        [
+          {
+            "node": "Save New Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restore Jobs After CV Load": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Rate Gate": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compact Job Description": {
+      "main": [
+        [
+          {
+            "node": "Prepare AI Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle AI Failure": {
+      "main": [
+        [
+          {
+            "node": "Save New Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "d744d23b-a411-4f04-85ae-5858a639f8d3",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "759b65fe6e3f9dc383eb92635fd5e595db474b16d593150f1dbb4d4ac5411965"
+  },
+  "nodeGroups": [],
+  "id": "WdcUaVD8a3n1ySf7",
+  "tags": [
+    {
+      "updatedAt": "2026-09-17T14:10:11.874Z",
+      "createdAt": "2026-09-17T14:10:11.874Z",
+      "id": "kDnxvjMsDq9SJpEM",
+      "name": "Github"
+    }
+  ]
+}
