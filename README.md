@@ -1480,6 +1480,6 @@ The result is a pipeline designed around **cost control, traceability, reliabili
 
 ## License
 
-This project is licensed under the **MIT License**.
+This project is licensed under the [MIT License](LICENSE).
 
-See [`LICENSE`](LICENSE) for details.
+You are free to use, modify, and distribute this project in accordance with the terms of the license.
