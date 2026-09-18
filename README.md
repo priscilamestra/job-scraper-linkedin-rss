@@ -1211,12 +1211,11 @@ job-scraper-linkedin-rss/
 │   └── 03-cover-letter-generator.json
 │
 ├── Docs/
-│   ├── PRD.md
 │   └── job-tracker-template.xlsx
 │
-├── images/
-│   ├── linkedin-job-pipeline-demo.gif
-│   ├── google-sheets-job-tracker.png
+├── Images/
+│   ├── google-sheets-job-tracker-01.png
+│   ├── google-sheets-job-tracker-02.png
 │   └── fetchrss-linkedin-feed.png
 │
 ├── .gitignore
