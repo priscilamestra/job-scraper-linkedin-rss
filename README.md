@@ -1,6 +1,6 @@
-# LinkedIn Job Scraper & AI Application Pipeline
+﻿# LinkedIn Job Scraper & AI Application Pipeline
 
-![n8n](https://img.shields.io/badge/n8n-Workflow%20Automation-EA4B71?style=flat-square&logo=n8n&logoColor=white) ![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=flat-square&logo=javascript&logoColor=000000) ![AI Automation](https://img.shields.io/badge/AI-Automation-6C63FF?style=flat-square) ![Groq](https://img.shields.io/badge/Groq-API-F55036?style=flat-square) ![Google Sheets](https://img.shields.io/badge/Google%20Sheets-34A853?style=flat-square&logo=googlesheets&logoColor=white) ![Google Drive](https://img.shields.io/badge/Google%20Drive-4285F4?style=flat-square&logo=googledrive&logoColor=white) ![LinkedIn](https://img.shields.io/badge/LinkedIn-Job%20Discovery-0A66C2?style=flat-square&logo=linkedin&logoColor=white) ![API Integration](https://img.shields.io/badge/API-Integration-0A66C2?style=flat-square)
+![n8n](https://img.shields.io/badge/n8n-Workflow%20Automation-EA4B71?style=flat-square&logo=n8n&logoColor=white) ![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=flat-square&logo=javascript&logoColor=000000) ![AI Automation](https://img.shields.io/badge/AI-Automation-6C63FF?style=flat-square) ![Groq](https://img.shields.io/badge/Groq-API-F55036?style=flat-square) ![Google Sheets](https://img.shields.io/badge/Google%20Sheets-34A853?style=flat-square&logo=googlesheets&logoColor=white) ![Google Drive](https://img.shields.io/badge/Google%20Drive-4285F4?style=flat-square&logo=googledrive&logoColor=white) ![LinkedIn](https://img.shields.io/badge/LinkedIn-Job%20Discovery-0A66C2?style=flat-square&logo=linkedin&logoColor=white) ![API Integration](https://img.shields.io/badge/API-Integration-0A66C2?style=flat-square
 
 A **low-cost, human-in-the-loop job intelligence and application-support pipeline** built with n8n.
 
@@ -23,14 +23,6 @@ Each workflow has a separate responsibility, execution pattern, and cost profile
 The central engineering principle is:
 
 > **Use deterministic automation for tasks that do not require semantic judgment. Use AI only where language understanding adds real value, and preserve human control over application decisions.**
-
-## Demo
-
-![LinkedIn Job Pipeline demo](images/linkedin-job-pipeline-demo.gif)
-
-<p align="center">
-  <em><strong>Demo.</strong> Google Sheets being updated automatically as new jobs move through discovery, enrichment, qualification, and recruiter-message generation.</em>
-</p>
 
 ## Problem
 
@@ -90,11 +82,12 @@ The complete pipeline:
 The system is intentionally **not an autonomous mass-application bot**.
 
 AI estimates professional fit and assists with recruiter communication, but the user remains responsible for deciding which opportunities should move forward.
+![Google Sheets job tracker - job data](images/google-sheets-job-tracker-01.png)
 
-![Job tracking workspace](images/google-sheets-job-tracker.png)
+![Google Sheets job tracker - application workflow](images/google-sheets-job-tracker-02.png)
 
 <p align="center">
-  <em><strong>Figure 1.</strong> Google Sheets workspace combining job metadata, technical Match, manual qualification, recruiter outreach, and application status.</em>
+  <em><strong>Figure 1.</strong> Google Sheets workspace combining job metadata, technical Match, manual qualification, recruiter outreach, and application tracking.</em>
 </p>
 
 ## Architecture
